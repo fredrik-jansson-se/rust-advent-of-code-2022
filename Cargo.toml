@@ -1,0 +1,13 @@
+[package]
+name = "advent_of_code2021"
+version = "0.1.0"
+authors = ["Fredrik Jansson <frjansso@cisco.com>"]
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+derive-try-from-primitive = "1.0.0"
+ndarray = "0"
+nom = {version = "7", features = []}
+# nom-regex = "0.2.0"
+pathfinding = "3"
