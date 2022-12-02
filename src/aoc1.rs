@@ -22,13 +22,13 @@ fn parse(input: Input) -> PResult {
 }
 
 fn run_1(input_txt: &str) -> anyhow::Result<u32> {
-    let (_, input) = parse(&input_txt).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let (_, input) = parse(input_txt).map_err(|e| anyhow::anyhow!("{e}"))?;
     let max = input.iter().map(|elf| elf.iter().sum()).max().unwrap();
     Ok(max)
 }
 
 fn run_2(input_txt: &str) -> anyhow::Result<u32> {
-    let (_, input) = parse(&input_txt).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let (_, input) = parse(input_txt).map_err(|e| anyhow::anyhow!("{e}"))?;
     let mut sums: Vec<u32> = input.iter().map(|elf| elf.iter().sum()).collect();
     sums.sort_by(|a, b| b.cmp(a));
 

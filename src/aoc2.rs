@@ -1,102 +1,161 @@
 pub fn run() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("day2.txt")?;
-    let input = parse(&input)?;
     println!("2:1: {}", run_1(&input)?);
     println!("2:2: {}", run_2(&input)?);
     Ok(())
 }
 
-fn run_1(input: &[Command]) -> anyhow::Result<isize> {
-    let (x, d) = input.iter().fold((0, 0), |(x, d), cmd| match cmd {
-        Command::Forward(v) => (x + v, d),
-        Command::Down(v) => (x, d + v),
-        Command::Up(v) => (x, d - v),
-    });
-    Ok(x * d)
+fn run_1(input: &str) -> anyhow::Result<usize> {
+    let (_, plays) = parse_1(input).map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    let res: usize = plays.iter().map(|(a, b)| b.play(a)).sum();
+    Ok(res)
 }
 
-fn run_2(input: &[Command]) -> anyhow::Result<isize> {
-    let (x, d, _aim) = input.iter().fold((0, 0, 0), |(x, d, aim), cmd| match cmd {
-        Command::Forward(v) => (x + v, d + aim * v, aim),
-        Command::Down(v) => (x, d, aim + v),
-        Command::Up(v) => (x, d, aim - v),
-    });
-    Ok(x * d)
+fn run_2(input: &str) -> anyhow::Result<usize> {
+    let (_, plays) = parse_2(input).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let plays = plays.iter().map(|(o, d)| (o, d.play(o)));
+    let res: usize = plays.map(|(a, b)| b.play(a)).sum();
+    Ok(res)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Play {
+    Rock,
+    Paper,
+    Scissors,
 }
 
 #[derive(Debug, PartialEq)]
-enum Command {
-    Forward(isize),
-    Down(isize),
-    Up(isize),
+enum Desired {
+    Win,
+    Draw,
+    Loss,
 }
 
-fn parse(i: &str) -> anyhow::Result<Vec<Command>> {
-    let fwd = nom::combinator::map(
-        nom::sequence::preceded(
-            nom::sequence::pair(
-                nom::bytes::complete::tag("forward"),
-                nom::character::complete::space0,
-            ),
-            crate::helper::ival::<isize>,
-        ),
-        Command::Forward,
+impl Desired {
+    fn play(&self, o: &Play) -> Play {
+        match self {
+            Self::Draw => *o,
+            Self::Win => match o {
+                Play::Rock => Play::Paper,
+                Play::Paper => Play::Scissors,
+                Play::Scissors => Play::Rock,
+            },
+            Self::Loss => match o {
+                Play::Rock => Play::Scissors,
+                Play::Paper => Play::Rock,
+                Play::Scissors => Play::Paper,
+            },
+        }
+    }
+}
+
+impl Play {
+    fn wins(&self, o: &Self) -> std::cmp::Ordering {
+        if self == o {
+            std::cmp::Ordering::Equal
+        } else {
+            match (self, o) {
+                (Self::Rock, Self::Scissors) => std::cmp::Ordering::Greater,
+                (Self::Paper, Self::Rock) => std::cmp::Ordering::Greater,
+                (Self::Scissors, Self::Paper) => std::cmp::Ordering::Greater,
+                _ => std::cmp::Ordering::Less,
+            }
+        }
+    }
+
+    fn score(&self) -> usize {
+        match self {
+            Self::Rock => 1,
+            Self::Paper => 2,
+            Self::Scissors => 3,
+        }
+    }
+
+    fn play(&self, o: &Self) -> usize {
+        let play_score = self.score();
+        let game_score = match self.wins(o) {
+            std::cmp::Ordering::Less => 0,
+            std::cmp::Ordering::Equal => 3,
+            std::cmp::Ordering::Greater => 6,
+        };
+
+        play_score + game_score
+    }
+}
+
+type Input<'a> = &'a str;
+type PResult<'a, T> = nom::IResult<Input<'a>, T, nom::error::VerboseError<Input<'a>>>;
+fn parse_play_1(i: Input) -> PResult<Play> {
+    use nom::{branch::alt, character::complete::char, combinator::map};
+    let rock_1 = map(char('A'), |_| Play::Rock);
+    let rock_2 = map(char('X'), |_| Play::Rock);
+    let paper_1 = map(char('B'), |_| Play::Paper);
+    let paper_2 = map(char('Y'), |_| Play::Paper);
+    let scissors_1 = map(char('C'), |_| Play::Scissors);
+    let scissors_2 = map(char('Z'), |_| Play::Scissors);
+    let play = alt((rock_1, rock_2, paper_1, paper_2, scissors_1, scissors_2))(i)?;
+    Ok(play)
+}
+
+fn parse_1(i: Input) -> PResult<Vec<(Play, Play)>> {
+    let round =
+        nom::sequence::separated_pair(parse_play_1, nom::character::complete::space1, parse_play_1);
+
+    let rounds = nom::multi::separated_list1(nom::character::complete::newline, round)(i)?;
+    Ok(rounds)
+}
+
+fn parse_play_2(i: Input) -> PResult<Play> {
+    use nom::{branch::alt, character::complete::char, combinator::map};
+    let rock_1 = map(char('A'), |_| Play::Rock);
+    let paper_1 = map(char('B'), |_| Play::Paper);
+    let scissors_1 = map(char('C'), |_| Play::Scissors);
+    let play = alt((rock_1, paper_1, scissors_1))(i)?;
+    Ok(play)
+}
+
+fn parse_desired(i: Input) -> PResult<Desired> {
+    use nom::{branch::alt, character::complete::char, combinator::map};
+    let draw = map(char('Y'), |_| Desired::Draw);
+    let win = map(char('Z'), |_| Desired::Win);
+    let loss = map(char('X'), |_| Desired::Loss);
+    let play = alt((draw, win, loss))(i)?;
+    Ok(play)
+}
+
+fn parse_2(i: Input) -> PResult<Vec<(Play, Desired)>> {
+    let round = nom::sequence::separated_pair(
+        parse_play_2,
+        nom::character::complete::space1,
+        parse_desired,
     );
-    let down = nom::combinator::map(
-        nom::sequence::preceded(
-            nom::sequence::pair(
-                nom::bytes::complete::tag("down"),
-                nom::character::complete::space0,
-            ),
-            crate::helper::ival::<isize>,
-        ),
-        Command::Down,
-    );
-    let up = nom::combinator::map(
-        nom::sequence::preceded(
-            nom::sequence::pair(
-                nom::bytes::complete::tag("up"),
-                nom::character::complete::space0,
-            ),
-            crate::helper::ival::<isize>,
-        ),
-        Command::Up,
-    );
-    let (_, res) = nom::multi::separated_list1(
-        nom::character::complete::newline,
-        nom::branch::alt((fwd, down, up)),
-    )(i)
-    .map_err(|e| e.to_owned())?;
-    Ok(res)
+
+    let rounds = nom::multi::separated_list1(nom::character::complete::newline, round)(i)?;
+    Ok(rounds)
 }
 
 #[cfg(test)]
 mod tests {
-    const INPUT: &str = "forward 5
-down 5
-forward 8
-up 3
-down 8
-forward 2";
+    const INPUT: &str = "A Y
+B X
+C Z";
 
     #[test]
     fn aoc2_parse() {
-        let input = super::parse(INPUT).unwrap();
+        let (_, input) = super::parse_1(INPUT).unwrap();
 
-        assert_eq!(input.len(), 6);
-        assert_eq!(input[0], super::Command::Forward(5));
-        assert_eq!(input[1], super::Command::Down(5));
+        assert_eq!(input.len(), 3);
     }
 
     #[test]
     fn aoc2_run_1() {
-        let input = super::parse(INPUT).unwrap();
-        assert_eq!(super::run_1(&input).unwrap(), 150);
+        assert_eq!(super::run_1(INPUT).unwrap(), 15);
     }
 
     #[test]
     fn aoc2_run_2() {
-        let input = super::parse(INPUT).unwrap();
-        assert_eq!(super::run_2(&input).unwrap(), 900);
+        assert_eq!(super::run_2(INPUT).unwrap(), 12);
     }
 }
