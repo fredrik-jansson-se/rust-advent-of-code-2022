@@ -8,106 +8,173 @@ pub fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_1(input: &str) -> anyhow::Result<usize> {
-    let lines: Vec<_> = parse(input)?;
+fn run_1(input: &str) -> anyhow::Result<String> {
+    let (_, mut game) = parse(input).map_err(|e| anyhow::anyhow!("{e}"))?;
 
-    let mut coord_cnt = std::collections::HashMap::new();
+    for mv in game.moves {
+        let (num, from, to) = mv;
 
-    for (c1, c2) in lines.iter() {
-        // vertical
-        if c1.0 == c2.0 {
-            // println!("{},{} -> {},{}", c1.0, c1.1, c2.0, c2.1);
-            let x = c1.0;
-            for y in c1.1.min(c2.1)..=c1.1.max(c2.1) {
-                // println!("\t{},{}", x, y);
-                *coord_cnt.entry((x, y)).or_insert(0) += 1;
-            }
+        for _ in 0..num {
+            let item = game.stack[from - 1].pop().unwrap();
+            game.stack[to - 1].push(item);
         }
-        // horizontal
-        else if c1.1 == c2.1 {
-            let y = c1.1;
-            for x in c1.0.min(c2.0)..=c1.0.max(c2.0) {
-                *coord_cnt.entry((x, y)).or_insert(0) += 1;
+    }
+
+    let mut res = String::new();
+    for s in game.stack.iter() {
+        if let StackItem::Crate(c) = s[s.len() - 1] {
+            res += &format!("{c}");
+        }
+    }
+    Ok(res)
+}
+
+fn run_2(input: &str) -> anyhow::Result<String> {
+    let (_, mut game) = parse(input).map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    for mv in game.moves {
+        let (num, from, to) = mv;
+
+        let mut tmp = Vec::new();
+        for _ in 0..num {
+            let item = game.stack[from - 1].pop().unwrap();
+            tmp.push(item);
+        }
+
+        for t in tmp.iter().rev() {
+            game.stack[to - 1].push(*t);
+        }
+    }
+
+    let mut res = String::new();
+    for s in game.stack.iter() {
+        if let StackItem::Crate(c) = s[s.len() - 1] {
+            res += &format!("{c}");
+        }
+    }
+    Ok(res)
+}
+
+type Input<'a> = &'a str;
+type PResult<'a, T> = nom::IResult<Input<'a>, T, nom::error::VerboseError<Input<'a>>>;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum StackItem {
+    Crate(char),
+    Empty,
+}
+
+fn parse_stack_item(i: Input) -> PResult<StackItem> {
+    let empty = nom::combinator::map(
+        nom::multi::many_m_n(3, 3, nom::character::complete::char(' ')),
+        |_| StackItem::Empty,
+    );
+    let c = nom::combinator::map(
+        nom::sequence::delimited(
+            nom::bytes::complete::tag("["),
+            nom::character::complete::anychar,
+            nom::bytes::complete::tag("]"),
+        ),
+        StackItem::Crate,
+    );
+
+    let r = nom::branch::alt((empty, c))(i)?;
+    Ok(r)
+}
+
+fn parse_stack_horiz(i: Input) -> PResult<Vec<StackItem>> {
+    let r = nom::multi::separated_list0(nom::bytes::complete::tag(" "), parse_stack_item)(i)?;
+    Ok(r)
+}
+
+fn parse_move(i: Input) -> PResult<(usize, usize, usize)> {
+    use nom::bytes::complete::tag;
+
+    let (i, _) = tag("move ")(i)?;
+    let (i, num) = nom::character::complete::u32(i)?;
+    let (i, _) = tag(" from ")(i)?;
+    let (i, from) = nom::character::complete::u32(i)?;
+    let (i, _) = tag(" to ")(i)?;
+    let (i, to) = nom::character::complete::u32(i)?;
+    Ok((i, (num as usize, from as usize, to as usize)))
+}
+
+struct Game {
+    stack: Vec<Vec<StackItem>>,
+    moves: Vec<(usize, usize, usize)>,
+}
+
+fn parse(i: &str) -> PResult<Game> {
+    let (i, mut stack) =
+        nom::multi::separated_list0(nom::character::complete::newline, parse_stack_horiz)(i)?;
+    stack.retain(|row| !row.is_empty());
+
+    // Transform stack from horizontal
+    let mut real_stack = Vec::new();
+    for row in stack.iter().rev() {
+        for (col_idx, item) in row.iter().enumerate() {
+            if real_stack.get(col_idx).is_none() {
+                real_stack.push(Vec::new());
+            }
+            if *item != StackItem::Empty {
+                let col = &mut real_stack[col_idx];
+                col.push(*item);
             }
         }
     }
 
-    Ok(coord_cnt.iter().filter(|(_, v)| **v >= 2).count())
-}
+    let (i, _) = nom::multi::many0(nom::sequence::preceded(
+        nom::character::complete::space0,
+        nom::character::complete::u32,
+    ))(i)?;
+    let (i, _) = nom::character::complete::space0(i)?;
+    let (i, _) = nom::multi::many1(nom::character::complete::newline)(i)?;
 
-fn run_2(input: &str) -> anyhow::Result<usize> {
-    let lines: Vec<_> = parse(input)?;
+    let (i, moves) = nom::multi::separated_list0(nom::character::complete::newline, parse_move)(i)?;
 
-    let mut coord_cnt = std::collections::HashMap::new();
-
-    for (c1, c2) in lines.iter() {
-        // vertical
-        if c1.0 == c2.0 {
-            // println!("{},{} -> {},{}", c1.0, c1.1, c2.0, c2.1);
-            let x = c1.0;
-            for y in c1.1.min(c2.1)..=c1.1.max(c2.1) {
-                // println!("\t{},{}", x, y);
-                *coord_cnt.entry((x, y)).or_insert(0) += 1;
-            }
-        } else {
-            let (c1, c2) = if c1.0 < c2.0 { (c1, c2) } else { (c2, c1) };
-            let k = (c2.1 - c1.1) / (c2.0 - c1.0);
-            for x in c1.0..=c2.0 {
-                let y = c1.1 + k * (x - c1.0);
-                *coord_cnt.entry((x, y)).or_insert(0) += 1;
-            }
-        }
-    }
-
-    Ok(coord_cnt.iter().filter(|(_, v)| **v >= 2).count())
-}
-
-type Coord = (isize, isize);
-
-fn parse(i: &str) -> anyhow::Result<Vec<(Coord, Coord)>> {
-    let coord = |i| {
-        nom::sequence::separated_pair(
-            crate::helper::ival,
-            nom::bytes::complete::tag(","),
-            crate::helper::ival,
-        )(i)
-    };
-
-    let line = nom::sequence::separated_pair(coord, nom::bytes::complete::tag(" -> "), coord);
-
-    let (_, lines) = nom::multi::separated_list1(nom::character::complete::newline, line)(i)
-        .map_err(|e| e.to_owned())?;
-
-    Ok(lines)
+    Ok((
+        i,
+        Game {
+            stack: real_stack,
+            moves,
+        },
+    ))
 }
 
 #[cfg(test)]
 mod tests {
-    const INPUT: &str = "0,9 -> 5,9
-8,0 -> 0,8
-9,4 -> 3,4
-2,2 -> 2,1
-7,0 -> 7,4
-6,4 -> 2,0
-0,9 -> 2,9
-3,4 -> 1,4
-0,0 -> 8,8
-5,5 -> 8,2";
+    const INPUT: &str = "    [D]
+[N] [C]
+[Z] [M] [P]
+ 1   2   3 
+
+move 1 from 2 to 1
+move 3 from 1 to 3
+move 2 from 2 to 1
+move 1 from 1 to 2
+";
 
     #[test]
     fn aoc5_parse() {
-        let lines = super::parse(INPUT).unwrap();
-        assert_eq!(lines.len(), 10);
-        assert_eq!(lines[0].0, (0, 9));
-        assert_eq!(lines[9].1, (8, 2));
+        assert_eq!(
+            super::parse_stack_item("   ").unwrap().1,
+            super::StackItem::Empty
+        );
+        assert_eq!(
+            super::parse_stack_item("[A]").unwrap().1,
+            super::StackItem::Crate('A')
+        );
+
+        let (_, game) = super::parse(INPUT).unwrap();
+        assert_eq!(game.moves.len(), 4);
     }
 
     #[test]
     fn aoc5_run_1() {
-        assert_eq!(super::run_1(INPUT).unwrap(), 5);
+        assert_eq!(super::run_1(INPUT).unwrap().as_str(), "CMZ");
     }
     #[test]
     fn aoc5_run_2() {
-        assert_eq!(super::run_2(INPUT).unwrap(), 12);
+        assert_eq!(super::run_2(INPUT).unwrap().as_str(), "MCD");
     }
 }
