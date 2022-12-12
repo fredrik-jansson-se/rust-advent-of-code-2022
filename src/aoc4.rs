@@ -1,3 +1,4 @@
+use crate::{Input, PResult};
 use std::fs;
 
 pub fn run() -> anyhow::Result<()> {
@@ -44,9 +45,6 @@ fn run_2(input: &str) -> anyhow::Result<usize> {
 
     Ok(cnt)
 }
-type Input<'a> = &'a str;
-type PResult<'a, T> = nom::IResult<Input<'a>, T, nom::error::VerboseError<Input<'a>>>;
-
 type Section = std::ops::RangeInclusive<u32>;
 fn parse_section(i: Input) -> PResult<Section> {
     use nom::{bytes::complete::tag, character::complete::u32, sequence::separated_pair};

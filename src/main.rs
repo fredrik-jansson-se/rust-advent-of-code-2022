@@ -1,5 +1,8 @@
 use std::env;
 
+type Input<'a> = &'a str;
+type PResult<'a, T> = nom::IResult<Input<'a>, T, nom::error::VerboseError<Input<'a>>>;
+
 mod aoc1;
 mod aoc10;
 mod aoc11;

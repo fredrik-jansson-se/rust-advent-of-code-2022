@@ -7,10 +7,9 @@ pub fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-type Input<'a> = &'a str;
-type PResult<'a> = nom::IResult<Input<'a>, Vec<Vec<u32>>, nom::error::VerboseError<Input<'a>>>;
+use crate::{Input, PResult};
 
-fn parse(input: Input) -> PResult {
+fn parse(input: Input) -> PResult<Vec<Vec<u32>>> {
     let (i, res) = nom::multi::separated_list1(
         nom::multi::many_m_n(2, 2, nom::character::complete::newline),
         nom::multi::separated_list1(

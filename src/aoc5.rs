@@ -1,3 +1,4 @@
+use crate::{Input, PResult};
 use std::fs;
 
 pub fn run() -> anyhow::Result<()> {
@@ -54,9 +55,6 @@ fn run_2(input: &str) -> anyhow::Result<String> {
     }
     Ok(res)
 }
-
-type Input<'a> = &'a str;
-type PResult<'a, T> = nom::IResult<Input<'a>, T, nom::error::VerboseError<Input<'a>>>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum StackItem {

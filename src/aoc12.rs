@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-};
+use std::{collections::HashMap, fs};
 
 pub fn run() -> anyhow::Result<()> {
     let input = fs::read_to_string("day12.txt").unwrap();
@@ -10,160 +7,94 @@ pub fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-type Map<'a> = HashMap<&'a str, Vec<&'a str>>;
-type ToVisit<'a> = Vec<&'a str>;
+type Coord = (isize, isize);
+type Map = HashMap<Coord, usize>;
 
-fn get_nbrs<'a>(current: &'a str, map: &Map<'a>, visited: &HashSet<&'a str>) -> Vec<&'a str> {
-    map.get(current)
-        .expect("find current")
-        .iter()
-        .filter(|v| !visited.contains(*v))
-        .copied()
-        .collect()
-}
+fn get_nbrs(current: Coord, map: &Map) -> Vec<(Coord, usize)> {
+    let (x, y) = current;
+    let mut nbrs = vec![
+        ((x - 1, y), 1),
+        ((x + 1, y), 1),
+        ((x, y - 1), 1),
+        ((x, y + 1), 1),
+    ];
 
-fn get_nbrs2<'a>(current: &'a str, map: &Map<'a>, to_visit: &[&'a str]) -> Vec<&'a str> {
-    map.get(current)
-        .expect("find current")
-        .iter()
-        .filter(|v| to_visit.contains(v))
-        .copied()
-        .collect()
-}
+    let cur_height = *map.get(&current).unwrap();
 
-fn search<'a>(current: &'a str, map: &Map<'a>, mut visited: HashSet<&'a str>) -> Vec<Vec<&'a str>> {
-    if current == "end" {
-        return vec![vec!["end"]];
-    }
-
-    let mut res = Vec::new();
-    if current.chars().any(|c| c.is_lowercase()) {
-        visited.insert(current);
-    }
-    for n in get_nbrs(current, map, &visited) {
-        let mut paths = search(n, map, visited.clone());
-        for p in paths.iter_mut() {
-            p.push(current);
-        }
-        res.append(&mut paths);
-    }
-    res
-}
-
-fn search2<'a>(current: &'a str, map: &Map<'a>, mut to_visit: ToVisit<'a>) -> Vec<Vec<&'a str>> {
-    if current == "end" {
-        return vec![vec!["end"]];
-    }
-
-    let mut res = Vec::new();
-    if current.chars().any(|c| c.is_lowercase()) {
-        if let Some(pos) = to_visit.iter().position(|c| *c == current) {
-            to_visit.remove(pos);
-        }
-    }
-
-    for n in get_nbrs2(current, map, &to_visit) {
-        let mut paths = search2(n, map, to_visit.clone());
-        for p in paths.iter_mut() {
-            p.push(current);
-        }
-        res.append(&mut paths);
-    }
-    res
+    nbrs.retain(|(p, _)| cur_height >= (*map.get(p).unwrap_or(&usize::MAX) - 1));
+    nbrs
 }
 
 fn run_1(input: &str) -> anyhow::Result<usize> {
-    let map = parse(input);
-    Ok(search("start", &map, HashSet::new()).len())
+    let (map, start, end) = parse(input);
+
+    let path = pathfinding::directed::astar::astar(
+        &start,
+        |c| get_nbrs(*c, &map),
+        |c| ((c.0 - end.0) * (c.0 - end.0) + (c.1 - end.1) * (c.1 - end.1)) as usize,
+        |c| *c == end,
+    )
+    .unwrap();
+    Ok(path.0.len() - 1)
 }
 
 fn run_2(input: &str) -> anyhow::Result<usize> {
-    let map = parse(input);
+    let (map, _start, end) = parse(input);
 
-    let visit_twice: Vec<&str> = map
-        .keys()
-        .filter(|c| **c != "start" && **c != "end")
-        .filter(|c| c.chars().any(|c| c.is_lowercase()))
-        .copied()
-        .collect();
+    let mut min = usize::MAX;
+    for start in map.iter().filter(|(_, h)| **h == ('a' as usize)) {
+        let (start, _) = start;
+        if let Some(path) = pathfinding::directed::astar::astar(
+            start,
+            |c| get_nbrs(*c, &map),
+            |c| ((c.0 - end.0) * (c.0 - end.0) + (c.1 - end.1) * (c.1 - end.1)) as usize,
+            |c| *c == end,
+        ) {
+            min = min.min(path.0.len() - 1);
+        }
+    }
+    Ok(min)
+}
 
-    let mut paths = HashSet::new();
-
-    for vt in visit_twice {
-        let mut to_visit: Vec<&str> = map.keys().copied().collect();
-        to_visit.push(vt);
-        for p in search2("start", &map, to_visit) {
-            paths.insert(p);
+fn parse(input: &str) -> (Map, Coord, Coord) {
+    let mut map: HashMap<(isize, isize), usize> = HashMap::new();
+    let mut start = (0, 0);
+    let mut end = (0, 0);
+    for (row, line) in input.lines().enumerate() {
+        for (col, c) in line.chars().enumerate() {
+            let c = match c {
+                'S' => {
+                    start = (row as isize, col as isize);
+                    'a'
+                }
+                'E' => {
+                    end = (row as isize, col as isize);
+                    'z'
+                }
+                c => c,
+            };
+            map.insert((row as isize, col as isize), c as usize);
         }
     }
 
-    Ok(paths.len())
-}
-
-fn parse(input: &str) -> Map {
-    let mut res: HashMap<&str, Vec<&str>> = HashMap::new();
-    for line in input.lines() {
-        let mut s = line.split('-');
-        let a = s.next().expect("key");
-        let b = s.next().expect("value");
-        res.entry(a).or_default().push(b);
-        res.entry(b).or_default().push(a);
-    }
-
-    res
+    (map, start, end)
 }
 
 #[cfg(test)]
 mod tests {
-    const INPUT_1: &str = "start-A
-start-b
-A-c
-A-b
-b-d
-A-end
-b-end";
-
-    const INPUT_2: &str = "dc-end
-HN-start
-start-kj
-dc-start
-dc-HN
-LN-dc
-HN-end
-kj-sa
-kj-HN
-kj-dc";
-
-    const INPUT_3: &str = "fs-end
-he-DX
-fs-he
-start-DX
-pj-DX
-end-zg
-zg-sl
-zg-pj
-pj-he
-RW-he
-fs-DX
-pj-RW
-zg-RW
-start-pj
-he-WI
-zg-he
-pj-fs
-start-RW";
+    const INPUT_1: &str = "Sabqponm
+abcryxxl
+accszExk
+acctuvwj
+abdefghi";
 
     #[test]
     fn aoc12_run_1() {
-        assert_eq!(super::run_1(INPUT_1).unwrap(), 10);
-        assert_eq!(super::run_1(INPUT_2).unwrap(), 19);
-        assert_eq!(super::run_1(INPUT_3).unwrap(), 226);
+        assert_eq!(super::run_1(INPUT_1).unwrap(), 31);
     }
 
     #[test]
     fn aoc12_run_2() {
-        assert_eq!(super::run_2(INPUT_1).unwrap(), 36);
-        assert_eq!(super::run_2(INPUT_2).unwrap(), 103);
-        assert_eq!(super::run_2(INPUT_3).unwrap(), 3509);
+        assert_eq!(super::run_2(INPUT_1).unwrap(), 29);
     }
 }

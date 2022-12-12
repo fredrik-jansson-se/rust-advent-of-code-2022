@@ -1,3 +1,5 @@
+use crate::{Input, PResult};
+
 pub fn run() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("day2.txt")?;
     println!("2:1: {}", run_1(&input)?);
@@ -85,8 +87,6 @@ impl Play {
     }
 }
 
-type Input<'a> = &'a str;
-type PResult<'a, T> = nom::IResult<Input<'a>, T, nom::error::VerboseError<Input<'a>>>;
 fn parse_play_1(i: Input) -> PResult<Play> {
     use nom::{branch::alt, character::complete::char, combinator::map};
     let rock_1 = map(char('A'), |_| Play::Rock);
