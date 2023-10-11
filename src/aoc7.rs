@@ -11,7 +11,6 @@ pub fn run_1(input: &str) -> anyhow::Result<usize> {
     let (_, listing) = parse(input).map_err(|e| anyhow::anyhow!("{e}"))?;
 
     let dir: Directory = listing.try_into()?;
-    dbg!{&dir};
 
     let mut sizes = Vec::new();
 
@@ -27,8 +26,30 @@ pub fn run_1(input: &str) -> anyhow::Result<usize> {
     Ok(sizes.into_iter().sum())
 }
 
-pub fn run_2(_input: &str) -> anyhow::Result<isize> {
-    Ok(0)
+pub fn run_2(input: &str) -> anyhow::Result<usize> {
+    let (_, listing) = parse(input).map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    let dir: Directory = listing.try_into()?;
+    const TOTAL_SIZE: usize = 70_000_000;
+    const NEEDED: usize = 30_000_000;
+
+    let unused = TOTAL_SIZE - dir.size;
+
+    let mut sizes = Vec::new();
+
+    fn calc(d: &Directory, sizes: &mut Vec<usize>) {
+        d.directories.iter().for_each(|d| calc(d, sizes));
+
+        sizes.push(d.size);
+    }
+    calc(&dir, &mut sizes);
+
+    // Would deleting this directory free up enough space?
+    sizes.retain(|s| {
+        s + unused >= NEEDED
+    });
+
+    Ok(*sizes.iter().min().unwrap())
 }
 
 #[derive(Debug, PartialEq)]
@@ -62,7 +83,7 @@ struct File {
 
 #[derive(Debug)]
 struct Directory {
-    name: String,
+    // name: String,
     files: Vec<File>,
     directories: Vec<Box<Directory>>,
     size: usize,
@@ -151,11 +172,11 @@ fn parse(mut i: crate::Input) -> crate::PResult<DirListing> {
 
 fn to_dir(d: &DirListing, cur_dir: &std::path::Path) -> anyhow::Result<Directory> {
     let mut dir = Directory {
-        name: cur_dir
-            .file_name()
-            .and_then(|p| dbg! {p}.to_str())
-            .map(|s| s.to_owned())
-            .unwrap_or("/".to_string()),
+        // name: cur_dir
+        //     .file_name()
+        //     .and_then(|p| p.to_str())
+        //     .map(|s| s.to_owned())
+        //     .unwrap_or("/".to_string()),
         files: Default::default(),
         directories: Default::default(),
         size: 0,
@@ -229,5 +250,7 @@ $ ls
     }
 
     #[test]
-    fn aoc7_run_2() {}
+    fn aoc7_run_2() {
+        assert_eq!(super::run_2(INPUT).unwrap(), 24933642);
+    }
 }
