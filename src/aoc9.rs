@@ -7,150 +7,145 @@ pub fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_1(input: &str) -> anyhow::Result<isize> {
-    let map = parse(input)?;
+fn run_1(input: &str) -> anyhow::Result<usize> {
+    let (_, moves) = parse(input).map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
-    let get_val = |(row, col): &(isize, isize)| {
-        if *row >= 0
-            && *row < (map.len() as isize)
-            && *col >= 0
-            && *col < (map[*row as usize].len() as isize)
-        {
-            Some(map[*row as usize][*col as usize])
-        } else {
-            None
-        }
-    };
+    let mut tail_visited = std::collections::HashSet::new();
+    let mut head = Coord(0, 0);
+    let mut tail = Coord(0, 0);
+    tail_visited.insert(tail);
+    for m in moves {
+        let (num_moves, dx, dy) = match m {
+            Move::Left(m) => (m, -1, 0),
+            Move::Right(m) => (m, 1, 0),
+            Move::Up(m) => (m, 0, 1),
+            Move::Down(m) => (m, 0, -1),
+        };
 
-    let mut risk_level = 0;
-    for (r, row) in map.iter().enumerate() {
-        for (c, col) in row.iter().enumerate() {
-            let min_surround = [
-                (r as isize - 1, c as isize),
-                (r as isize + 1, c as isize),
-                (r as isize, c as isize - 1),
-                (r as isize, c as isize + 1),
-            ]
-            .iter()
-            .filter_map(get_val)
-            .min()
-            .unwrap_or(isize::MAX);
-            if *col < min_surround {
-                risk_level += col + 1;
+        for _ in 0..num_moves {
+            head.0 += dx;
+            head.1 += dy;
+
+            // need to move tail
+            if head.sq_distance(&tail) > 2 {
+                let dx = (head.0 - tail.0).clamp(-1, 1);
+                let dy = (head.1 - tail.1).clamp(-1, 1);
+                tail.0 += dx;
+                tail.1 += dy;
             }
+            tail_visited.insert(tail);
         }
+
     }
 
-    Ok(risk_level)
+    Ok(tail_visited.len())
 }
 
 fn run_2(input: &str) -> anyhow::Result<usize> {
-    let map = parse(input)?;
+    let (_, moves) = parse(input).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let mut rope = [Coord(0,0);10];
+    let mut tail_visited = std::collections::HashSet::new();
+    tail_visited.insert(Coord(0,0));
+    for m in moves {
+        let (num_moves, dx, dy) = match m {
+            Move::Left(m) => (m, -1, 0),
+            Move::Right(m) => (m, 1, 0),
+            Move::Up(m) => (m, 0, 1),
+            Move::Down(m) => (m, 0, -1),
+        };
 
-    let get_val = |(row, col): &(isize, isize)| {
-        if *row >= 0
-            && *row < (map.len() as isize)
-            && *col >= 0
-            && *col < (map[*row as usize].len() as isize)
-        {
-            Some(map[*row as usize][*col as usize])
-        } else {
-            None
-        }
-    };
+        for _ in 0..num_moves {
+            rope[0].0 += dx;
+            rope[0].1 += dy;
 
-    let mut basin_points = std::collections::HashSet::new();
-
-    for (r, row) in map.iter().enumerate() {
-        for (c, col) in row.iter().enumerate() {
-            let min_surround = [
-                (r as isize - 1, c as isize),
-                (r as isize + 1, c as isize),
-                (r as isize, c as isize - 1),
-                (r as isize, c as isize + 1),
-            ]
-            .iter()
-            .filter_map(get_val)
-            .min()
-            .unwrap_or(isize::MAX);
-            if *col < min_surround {
-                basin_points.insert((r, c));
-            }
-        }
-    }
-
-    let is_nbr = |(row, col): &(isize, isize)| {
-        if *row >= 0
-            && *row < (map.len() as isize)
-            && *col >= 0
-            && *col < (map[*row as usize].len() as isize)
-        {
-            map[*row as usize][*col as usize] < 9
-        } else {
-            false
-        }
-    };
-
-    let mut basin_sizes: Vec<usize> = Vec::new();
-    while let Some(pt) = basin_points.iter().next().cloned() {
-        let mut searched = std::collections::HashSet::new();
-        let mut to_search = vec![pt];
-        while let Some(pt) = to_search.pop() {
-            searched.insert(pt);
-            basin_points.remove(&pt);
-            let r = pt.0;
-            let c = pt.1;
-            for n in [
-                (r as isize - 1, c as isize),
-                (r as isize + 1, c as isize),
-                (r as isize, c as isize - 1),
-                (r as isize, c as isize + 1),
-            ]
-            .iter()
-            .filter(|c| is_nbr(c))
-            {
-                let n = (n.0 as usize, n.1 as usize);
-                if !searched.contains(&n) {
-                    to_search.push((n.0, n.1));
+            for i in 1..rope.len() {
+                let head = rope[i-1];
+                let tail = &mut rope[i];
+                if head.sq_distance(tail) > 2 {
+                    let dx = (head.0 - tail.0).clamp(-1, 1);
+                    let dy = (head.1 - tail.1).clamp(-1, 1);
+                    tail.0 += dx;
+                    tail.1 += dy;
                 }
             }
+            tail_visited.insert(rope[9]);
         }
 
-        basin_sizes.push(searched.len());
     }
-
-    basin_sizes.sort_unstable();
-    // Multiply the top three sizes
-    Ok(basin_sizes.iter().rev().take(3).product())
+    Ok(tail_visited.len())
 }
 
-fn parse(i: &str) -> anyhow::Result<Vec<Vec<isize>>> {
-    let mut res = Vec::new();
-    for line in i.lines() {
-        let mut row: Vec<isize> = Vec::new();
-        for c in line.chars() {
-            row.push(c.to_digit(10).unwrap() as isize);
-        }
-        res.push(row);
+#[derive(Debug)]
+enum Move {
+    Left(isize),
+    Right(isize),
+    Up(isize),
+    Down(isize),
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+struct Coord(isize, isize);
+
+impl Coord {
+    fn sq_distance(&self, other: &Self) -> usize {
+        ((self.0 - other.0).pow(2) + (self.1 - other.1).pow(2)) as usize
     }
+}
+
+fn parse(i: crate::Input) -> crate::PResult<Vec<Move>> {
+    use nom::{
+        branch::alt,
+        bytes::complete::tag,
+        character::complete::{i64, newline},
+        combinator::map,
+        multi::separated_list1,
+        sequence::preceded,
+    };
+    let up = map(preceded(tag("U "), i64), |m| Move::Up(m as isize));
+    let down = map(preceded(tag("D "), i64), |m| Move::Down(m as isize));
+    let left = map(preceded(tag("L "), i64), |m| Move::Left(m as isize));
+    let right = map(preceded(tag("R "), i64), |m| Move::Right(m as isize));
+
+    let row_parser = alt((up, down, left, right));
+
+    let res = separated_list1(newline, row_parser)(i)?;
+
     Ok(res)
 }
 
 #[cfg(test)]
 mod tests {
-    const INPUT: &str = "2199943210
-3987894921
-9856789892
-8767896789
-9899965678";
+    const INPUT: &str = "R 4
+U 4
+L 3
+D 1
+R 4
+D 1
+L 5
+R 2";
+
+    const INPUT_2: &str = "R 5
+U 8
+L 8
+D 3
+R 17
+D 10
+L 25
+U 20";
 
     #[test]
+    fn aoc9_parse() {
+        let (_, moves) = super::parse(INPUT).unwrap();
+        assert_eq!(moves.len(), 8);
+    }
+    #[test]
     fn aoc9_run_1() {
-        assert_eq!(super::run_1(INPUT).unwrap(), 15);
+        assert_eq!(super::run_1(INPUT).unwrap(), 13);
     }
 
     #[test]
     fn aoc9_run_2() {
-        assert_eq!(super::run_2(INPUT).unwrap(), 1134);
+        assert_eq!(super::run_2(INPUT).unwrap(), 1);
+        assert_eq!(super::run_2(INPUT_2).unwrap(), 36);
     }
 }
