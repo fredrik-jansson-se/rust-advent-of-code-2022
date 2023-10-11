@@ -10,32 +10,21 @@ pub fn run() -> anyhow::Result<()> {
 pub fn run_1(input: &str) -> anyhow::Result<usize> {
     let (_, listing) = parse(input).map_err(|e| anyhow::anyhow!("{e}"))?;
 
-    dbg! {&listing};
+    let dir: Directory = listing.try_into()?;
+    dbg!{&dir};
 
-    fn calc_sizes(
-        p: &std::path::Path,
-        lookup: &mut std::collections::HashMap<std::path::PathBuf, (usize, usize)>,
-        listing: &DirListing,
-    ) -> usize {
-        let dir_items = listing.get(p).unwrap();
-        let _lu = lookup.entry(p.to_owned()).or_insert((0, 0));
-        // dbg! {di};
-        for _item in dir_items {
-            // match item {
-            //     // &DirItem::Dir(d) {
-            //     //     lu.1 += calc_sizes(d);
-            //     // }
+    let mut sizes = Vec::new();
 
-            // }
+    fn calc(d: &Directory, sizes: &mut Vec<usize>) {
+        d.directories.iter().for_each(|d| calc(d, sizes));
+        if d.size < 100_000 {
+            sizes.push(d.size);
         }
-        0
     }
 
-    let mut lookup = std::collections::HashMap::new();
-    let start: std::path::PathBuf = "/".parse()?;
-    let res = calc_sizes(&start, &mut lookup, &listing);
+    calc(&dir, &mut sizes);
 
-    Ok(res)
+    Ok(sizes.into_iter().sum())
 }
 
 pub fn run_2(_input: &str) -> anyhow::Result<isize> {
@@ -65,15 +54,24 @@ fn parse_command(i: crate::Input) -> crate::PResult<Command> {
     Ok(res)
 }
 
-#[derive(Debug, PartialEq)]
-enum DirItem {
-    File(String, usize),
-    Dir(String),
+#[derive(Debug)]
+struct File {
+    name: String,
+    size: usize,
 }
 
-struct File {
-    size: usize,
+#[derive(Debug)]
+struct Directory {
     name: String,
+    files: Vec<File>,
+    directories: Vec<Box<Directory>>,
+    size: usize,
+}
+
+#[derive(Debug, PartialEq)]
+enum DirItem {
+    File { name: String, size: usize },
+    Dir { name: String },
 }
 
 fn parse_filename(i: crate::Input) -> crate::PResult<String> {
@@ -95,11 +93,16 @@ fn parse_dir_item(i: crate::Input) -> crate::PResult<DirItem> {
     use nom::{branch::alt, bytes::complete::tag, combinator::map};
     let dir = map(
         nom::sequence::preceded(tag("dir "), nom::character::complete::alphanumeric0),
-        |dir_name: &str| DirItem::Dir(dir_name.to_string()),
+        |dir_name: &str| DirItem::Dir {
+            name: dir_name.to_string(),
+        },
     );
     let file = map(
         nom::sequence::separated_pair(nom::character::complete::u64, tag(" "), parse_filename),
-        |(size, file_name): (u64, String)| DirItem::File(file_name, size as usize),
+        |(size, file_name): (u64, String)| DirItem::File {
+            name: file_name,
+            size: size as usize,
+        },
     );
 
     let res = alt((dir, file))(i)?;
@@ -146,6 +149,49 @@ fn parse(mut i: crate::Input) -> crate::PResult<DirListing> {
     Ok((i, listing))
 }
 
+fn to_dir(d: &DirListing, cur_dir: &std::path::Path) -> anyhow::Result<Directory> {
+    let mut dir = Directory {
+        name: cur_dir
+            .file_name()
+            .and_then(|p| dbg! {p}.to_str())
+            .map(|s| s.to_owned())
+            .unwrap_or("/".to_string()),
+        files: Default::default(),
+        directories: Default::default(),
+        size: 0,
+    };
+
+    let cur_dir_entry = d.get(cur_dir).ok_or(anyhow::anyhow!("no entry"))?;
+
+    for entry in cur_dir_entry {
+        match entry {
+            DirItem::File { name, size } => {
+                dir.files.push(File {
+                    name: name.to_owned(),
+                    size: *size,
+                });
+                dir.size += *size;
+            }
+            DirItem::Dir { name } => {
+                let sub_dir = Box::new(to_dir(d, &cur_dir.join(name))?);
+                dir.size += sub_dir.size;
+                dir.directories.push(sub_dir);
+            }
+        }
+    }
+
+    Ok(dir)
+}
+
+impl TryFrom<DirListing> for Directory {
+    type Error = anyhow::Error;
+
+    fn try_from(d: DirListing) -> Result<Self, Self::Error> {
+        let path = std::path::Path::new("/").to_owned();
+        to_dir(&d, &path)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     const INPUT: &str = "$ cd /
@@ -179,7 +225,7 @@ $ ls
 
     #[test]
     fn aoc7_run_1() {
-        assert_eq!(super::run_1(INPUT).unwrap(), 37);
+        assert_eq!(super::run_1(INPUT).unwrap(), 95437);
     }
 
     #[test]

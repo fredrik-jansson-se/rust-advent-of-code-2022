@@ -7,7 +7,8 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 derive-try-from-primitive = "1.0.0"
-ndarray = "0"
+lazy_static = "1"
 nom = {version = "7", features = []}
-# nom-regex = "0.2.0"
-pathfinding = "3"
+nom-regex = "0.2"
+regex = "1"
+pathfinding = "4"
