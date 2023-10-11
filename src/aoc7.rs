@@ -45,9 +45,7 @@ pub fn run_2(input: &str) -> anyhow::Result<usize> {
     calc(&dir, &mut sizes);
 
     // Would deleting this directory free up enough space?
-    sizes.retain(|s| {
-        s + unused >= NEEDED
-    });
+    sizes.retain(|s| s + unused >= NEEDED);
 
     Ok(*sizes.iter().min().unwrap())
 }
@@ -76,10 +74,7 @@ fn parse_command(i: crate::Input) -> crate::PResult<Command> {
 }
 
 #[derive(Debug)]
-struct File {
-    name: String,
-    size: usize,
-}
+struct File {}
 
 #[derive(Debug)]
 struct Directory {
@@ -91,7 +86,7 @@ struct Directory {
 
 #[derive(Debug, PartialEq)]
 enum DirItem {
-    File { name: String, size: usize },
+    File { size: usize },
     Dir { name: String },
 }
 
@@ -120,8 +115,7 @@ fn parse_dir_item(i: crate::Input) -> crate::PResult<DirItem> {
     );
     let file = map(
         nom::sequence::separated_pair(nom::character::complete::u64, tag(" "), parse_filename),
-        |(size, file_name): (u64, String)| DirItem::File {
-            name: file_name,
+        |(size, _): (u64, String)| DirItem::File {
             size: size as usize,
         },
     );
@@ -183,10 +177,8 @@ fn to_dir(d: &DirListing, cur_dir: &std::path::Path) -> anyhow::Result<Directory
 
     for entry in cur_dir_entry {
         match entry {
-            DirItem::File { name, size } => {
+            DirItem::File { size } => {
                 dir.files.push(File {
-                    name: name.to_owned(),
-                    size: *size,
                 });
                 dir.size += *size;
             }
