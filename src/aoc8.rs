@@ -53,8 +53,7 @@ fn run_1(input: &str) -> anyhow::Result<usize> {
     }
 
     let mut map = visible_map;
-    for r_i in 0..map.len() {
-        let row = &mut map[r_i];
+    for row in &mut map {
         let row_len = row.len();
         let mut max_from_left = -1;
         let mut max_from_right = -1;
@@ -99,8 +98,52 @@ fn run_1(input: &str) -> anyhow::Result<usize> {
 }
 
 fn run_2(input: &str) -> anyhow::Result<usize> {
-    let (_, _map) = parse(input).map_err(|e| anyhow::anyhow!("{e}"))?;
-    todo!()
+    let (_, map) = parse(input).map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    let mut scores = Vec::with_capacity(map.len() * map[0].len());
+    for cur_row in 0..map.len() {
+        let row = &map[cur_row];
+        for (cur_col, cur_tree) in row.iter().enumerate() {
+            let mut up = 0;
+            for r_i in (0..cur_row).rev() {
+                up += 1;
+                if map[r_i][cur_col] >= *cur_tree {
+                    break;
+                }
+            }
+
+            let mut down = 0;
+            for item in map.iter().skip(cur_row + 1) {
+                down += 1;
+                if item[cur_col] >= *cur_tree {
+                    break;
+                }
+            }
+            let mut left = 0;
+            for c_i in (0..cur_col).rev() {
+                left += 1;
+                if map[cur_row][c_i] >= *cur_tree {
+                    break;
+                }
+            }
+
+            let mut right = 0;
+            for c_i in (cur_col + 1)..map[cur_row].len() {
+                if cur_row == 3 && cur_col == 2 {
+                    dbg! {c_i};
+                }
+                right += 1;
+                if map[cur_row][c_i] >= *cur_tree {
+                    break;
+                }
+            }
+
+            let score = up * down * left * right;
+            scores.push(score);
+        }
+    }
+
+    Ok(*scores.iter().max().unwrap())
 }
 
 fn parse(i: crate::Input) -> crate::PResult<Map> {
@@ -140,6 +183,6 @@ mod tests {
 
     #[test]
     fn aoc8_run_2() {
-        assert_eq!(super::run_2(INPUT).unwrap(), 5353);
+        assert_eq!(super::run_2(INPUT).unwrap(), 8);
     }
 }

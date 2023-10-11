@@ -7,7 +7,7 @@ pub fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_1(input: &str, check_row: isize) -> anyhow::Result<usize> {
+fn run_1(input: &str, _check_row: isize) -> anyhow::Result<usize> {
     let (_, input) = parse(input).map_err(|e| anyhow::anyhow!("{e}"))?;
     dbg! {input};
     Ok(0)
@@ -23,7 +23,7 @@ type Reading = (Coord, Coord);
 
 fn parse(i: crate::Input) -> crate::PResult<Vec<Reading>> {
     let re = regex::Regex::new(
-        r#"Sensor at x=(-?\d+), y=(-?\d+): closest beacon is at x=(-?\d+), y=(-?\d+)"#,
+        r"Sensor at x=(-?\d+), y=(-?\d+): closest beacon is at x=(-?\d+), y=(-?\d+)",
     )
     .unwrap();
     let (i, captures) = nom_regex::str::re_captures(re)(i)?;

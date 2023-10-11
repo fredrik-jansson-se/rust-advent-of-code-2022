@@ -80,7 +80,7 @@ struct File {}
 struct Directory {
     // name: String,
     files: Vec<File>,
-    directories: Vec<Box<Directory>>,
+    directories: Vec<Directory>,
     size: usize,
 }
 
@@ -152,7 +152,7 @@ fn parse(mut i: crate::Input) -> crate::PResult<DirListing> {
                     nom::combinator::opt(nom::character::complete::newline),
                 )(ii)?;
 
-                let entries = listing.entry(cur_dir.clone()).or_insert_with(Vec::new);
+                let entries = listing.entry(cur_dir.clone()).or_default();
                 entries.append(&mut ls);
                 ii
             }
@@ -163,11 +163,6 @@ fn parse(mut i: crate::Input) -> crate::PResult<DirListing> {
 
 fn to_dir(d: &DirListing, cur_dir: &std::path::Path) -> anyhow::Result<Directory> {
     let mut dir = Directory {
-        // name: cur_dir
-        //     .file_name()
-        //     .and_then(|p| p.to_str())
-        //     .map(|s| s.to_owned())
-        //     .unwrap_or("/".to_string()),
         files: Default::default(),
         directories: Default::default(),
         size: 0,
@@ -183,7 +178,7 @@ fn to_dir(d: &DirListing, cur_dir: &std::path::Path) -> anyhow::Result<Directory
                 dir.size += *size;
             }
             DirItem::Dir { name } => {
-                let sub_dir = Box::new(to_dir(d, &cur_dir.join(name))?);
+                let sub_dir = to_dir(d, &cur_dir.join(name))?;
                 dir.size += sub_dir.size;
                 dir.directories.push(sub_dir);
             }

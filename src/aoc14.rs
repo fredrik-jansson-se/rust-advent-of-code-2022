@@ -31,8 +31,7 @@ fn run_1(input: &str) -> anyhow::Result<usize> {
     }
 
     let (min, max) = counts
-        .iter()
-        .map(|(_, v)| v)
+        .values()
         .fold((usize::MAX, 0), |(min, max), v| (min.min(*v), max.max(*v)));
 
     Ok(max - min)
@@ -63,8 +62,7 @@ fn run_2(input: &str) -> anyhow::Result<usize> {
     }
 
     let (min, max) = counts
-        .iter()
-        .map(|(_, v)| v)
+        .values()
         .fold((usize::MAX, 0), |(min, max), v| (min.min(*v), max.max(*v)));
 
     Ok(max - min)

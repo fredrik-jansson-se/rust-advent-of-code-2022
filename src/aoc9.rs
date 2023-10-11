@@ -111,7 +111,7 @@ fn run_2(input: &str) -> anyhow::Result<usize> {
             {
                 let n = (n.0 as usize, n.1 as usize);
                 if !searched.contains(&n) {
-                    to_search.push((n.0 as usize, n.1 as usize));
+                    to_search.push((n.0, n.1));
                 }
             }
         }
