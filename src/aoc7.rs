@@ -137,9 +137,7 @@ fn parse(mut i: crate::Input) -> crate::PResult<DirListing> {
     let mut cur_dir: std::path::PathBuf = "/".parse().unwrap();
     let mut listing = DirListing::new();
     while !i.is_empty() {
-        // dbg! {i};
         let (ii, cmd) = parse_command(i)?;
-        // dbg! {&cmd};
 
         i = match cmd {
             Command::CdRoot => {
@@ -162,7 +160,6 @@ fn parse(mut i: crate::Input) -> crate::PResult<DirListing> {
 
                 let entries = listing.entry(cur_dir.clone()).or_insert_with(Vec::new);
                 entries.append(&mut ls);
-                // dbg! {ls};
                 ii
             }
         };

@@ -7,20 +7,95 @@ pub fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-type Map = Vec<Vec<usize>>;
+type Map = Vec<Vec<isize>>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VisibleFrom {
+    Top,
+    Bottom,
+    Right,
+    Left,
+}
+
+#[derive(Debug, Clone)]
+struct Tree {
+    height: isize,
+    visible_from: Vec<VisibleFrom>,
+}
+
+impl Tree {
+    fn new(height: isize) -> Self {
+        Self {
+            height,
+            visible_from: vec![
+                VisibleFrom::Top,
+                VisibleFrom::Bottom,
+                VisibleFrom::Left,
+                VisibleFrom::Right,
+            ],
+        }
+    }
+    fn is_visible(&self) -> bool {
+        !self.visible_from.is_empty()
+    }
+}
 
 fn run_1(input: &str) -> anyhow::Result<usize> {
     let (_, map) = parse(input).map_err(|e| anyhow::anyhow!("{e}"))?;
-    let max_rows = map.len();
-    let max_cols = map[0].len();
 
-    let mut map_top = map.clone();
-    for col in 0..max_cols {
-        // let cur_max =
-        // for row in 0..max_rows {
-        // }
+    let mut visible_map = Vec::with_capacity(map.len());
+    for row in map.iter() {
+        let mut vrow = Vec::with_capacity(row.len());
+        for col in row.iter() {
+            vrow.push(Tree::new(*col));
+        }
+        visible_map.push(vrow);
     }
-    todo!()
+
+    let mut map = visible_map;
+    for r_i in 0..map.len() {
+        let row = &mut map[r_i];
+        let row_len = row.len();
+        let mut max_from_left = -1;
+        let mut max_from_right = -1;
+        for c_i in 0..row_len {
+            let cur_tree = &mut row[c_i];
+            if cur_tree.height <= max_from_left {
+                cur_tree.visible_from.retain(|v| *v != VisibleFrom::Left);
+            }
+            max_from_left = max_from_left.max(cur_tree.height);
+
+            let cur_tree = &mut row[row_len - 1 - c_i];
+            if cur_tree.height <= max_from_right {
+                cur_tree.visible_from.retain(|v| *v != VisibleFrom::Right);
+            }
+            max_from_right = max_from_right.max(cur_tree.height);
+        }
+    }
+
+    for c_i in 0..map[0].len() {
+        let height = map.len();
+        let mut max_from_top = -1;
+        let mut max_from_bottom = -1;
+        for r_i in 0..height {
+            let cur_tree = &mut map[r_i][c_i];
+            if cur_tree.height <= max_from_top {
+                cur_tree.visible_from.retain(|v| *v != VisibleFrom::Top);
+            }
+            max_from_top = max_from_top.max(cur_tree.height);
+
+            let cur_tree = &mut map[height - 1 - r_i][c_i];
+            if cur_tree.height <= max_from_bottom {
+                cur_tree.visible_from.retain(|v| *v != VisibleFrom::Bottom);
+            }
+            max_from_bottom = max_from_bottom.max(cur_tree.height);
+        }
+    }
+
+    Ok(map
+        .iter()
+        .map(|row| row.iter().filter(|tree| tree.is_visible()).count())
+        .sum())
 }
 
 fn run_2(input: &str) -> anyhow::Result<usize> {
@@ -34,7 +109,7 @@ fn parse(i: crate::Input) -> crate::PResult<Map> {
     for row in i.lines() {
         let res_row = row
             .chars()
-            .map(|c| c.to_digit(10).unwrap() as usize)
+            .map(|c| c.to_digit(10).unwrap() as isize)
             .collect();
         res.push(res_row);
     }
