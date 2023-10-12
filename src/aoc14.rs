@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs};
+use std::fs;
 
 pub fn run() -> anyhow::Result<()> {
     let input = fs::read_to_string("day14.txt").unwrap();
@@ -8,126 +8,158 @@ pub fn run() -> anyhow::Result<()> {
 }
 
 fn run_1(input: &str) -> anyhow::Result<usize> {
-    let (_, (mut template, recipies)) = parse(input).unwrap();
+    let (_, paths) = parse(input).map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
-    for _ in 0..10 {
-        let mut new_template = Vec::with_capacity(2 * template.len());
+    const SOURCE: Coord = Coord(500, 0);
 
-        for ab in template.windows(2) {
-            let a = ab[0];
-            let b = ab[1];
-            new_template.push(a);
-            new_template.push(*recipies.get(&(a, b)).unwrap());
+    let mut map: Map = Default::default();
+    let mut max_y = i64::MIN;
+    for path in paths {
+        for se in path.windows(2) {
+            let start = &se[0];
+            let end = &se[1];
+            max_y = max_y.max(start.1.max(end.1));
+
+            let dx = end.0 - start.0;
+            let dy = end.1 - start.1;
+            let path_len = dx.abs() + dy.abs();
+            let dx = dx.clamp(-1, 1);
+            let dy = dy.clamp(-1, 1);
+
+            for i in 0..=path_len {
+                map.insert(Coord(start.0 + i * dx, start.1 + i * dy));
+            }
         }
-        // last char not covered by the windows fn, add it back
-        new_template.push(template[template.len() - 1]);
-
-        template = new_template;
     }
 
-    let mut counts = HashMap::new();
-    for c in template {
-        *counts.entry(c).or_insert(0usize) += 1;
+    let mut cnt = 0;
+    loop {
+        let mut sand = SOURCE;
+        loop {
+            let down = Coord(sand.0, sand.1 + 1);
+            let down_left = Coord(sand.0 - 1, sand.1 + 1);
+            let down_right = Coord(sand.0 + 1, sand.1 + 1);
+
+            if !map.contains(&down) {
+                sand = down;
+                if sand.1 > max_y {
+                    break;
+                }
+            } else if !map.contains(&down_left) {
+                sand = down_left;
+            } else if !map.contains(&down_right) {
+                sand = down_right;
+            } else {
+                break;
+            }
+        }
+        map.insert(sand);
+        if sand.1 > max_y {
+            break;
+        }
+        cnt += 1;
     }
-
-    let (min, max) = counts
-        .values()
-        .fold((usize::MAX, 0), |(min, max), v| (min.min(*v), max.max(*v)));
-
-    Ok(max - min)
+    Ok(cnt)
 }
 
 fn run_2(input: &str) -> anyhow::Result<usize> {
-    let (_, (mut template, recipies)) = parse(input).unwrap();
+    let (_, paths) = parse(input).map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
-    for i in 0..40 {
-        let mut new_template = Vec::with_capacity(2 * template.len());
+    const SOURCE: Coord = Coord(500, 0);
 
-        for ab in template.windows(2) {
-            let a = ab[0];
-            let b = ab[1];
-            new_template.push(a);
-            new_template.push(*recipies.get(&(a, b)).unwrap());
+    let mut map: Map = Default::default();
+    let mut max_y = i64::MIN;
+    for path in paths {
+        for se in path.windows(2) {
+            let start = &se[0];
+            let end = &se[1];
+            max_y = max_y.max(start.1.max(end.1));
+
+            let dx = end.0 - start.0;
+            let dy = end.1 - start.1;
+            let path_len = dx.abs() + dy.abs();
+            let dx = dx.clamp(-1, 1);
+            let dy = dy.clamp(-1, 1);
+
+            for i in 0..=path_len {
+                map.insert(Coord(start.0 + i * dx, start.1 + i * dy));
+            }
         }
-        // last char not covered by the windows fn, add it back
-        new_template.push(template[template.len() - 1]);
-
-        template = new_template;
-        dbg! {(i, template.len())};
     }
 
-    let mut counts = HashMap::new();
-    for c in template {
-        *counts.entry(c).or_insert(0usize) += 1;
+    let mut cnt = 0;
+    let floor_y = max_y + 2;
+    loop {
+        let mut sand = SOURCE;
+        loop {
+            let down = Coord(sand.0, sand.1 + 1);
+
+            // Always stop ad the floor
+            if down.1 == floor_y {
+                break;
+            }
+            let down_left = Coord(sand.0 - 1, sand.1 + 1);
+            let down_right = Coord(sand.0 + 1, sand.1 + 1);
+
+            if !map.contains(&down) {
+                sand = down;
+            } else if !map.contains(&down_left) {
+                sand = down_left;
+            } else if !map.contains(&down_right) {
+                sand = down_right;
+            } else {
+                break;
+            }
+
+        }
+        map.insert(sand);
+        cnt += 1;
+        if sand == SOURCE {
+            break;
+        }
     }
-
-    let (min, max) = counts
-        .values()
-        .fold((usize::MAX, 0), |(min, max), v| (min.min(*v), max.max(*v)));
-
-    Ok(max - min)
+    Ok(cnt)
 }
 
-type Lookup = HashMap<(char, char), char>;
-fn parse(i: &str) -> nom::IResult<&str, (Vec<char>, Lookup)> {
-    // let template = nom::multi::many1(nom::character::complete::anychar);
-    let template = nom::character::complete::alpha1;
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+struct Coord(i64, i64);
 
-    let recipy = nom::sequence::separated_pair(
-        nom::sequence::pair(
-            nom::character::complete::anychar,
-            nom::character::complete::anychar,
+type Map = std::collections::HashSet<Coord>;
+
+fn parse(i: crate::Input) -> crate::PResult<Vec<Vec<Coord>>> {
+    let coord = nom::combinator::map(
+        nom::sequence::separated_pair(
+            nom::character::complete::i64,
+            nom::bytes::complete::tag(","),
+            nom::character::complete::i64,
         ),
-        nom::bytes::complete::tag(" -> "),
-        nom::character::complete::anychar,
+        |(x, y)| Coord(x, y),
     );
+    let path = nom::multi::separated_list1(nom::bytes::complete::tag(" -> "), coord);
 
-    let recipies = nom::multi::separated_list1(nom::character::complete::newline, recipy);
+    let mut paths = nom::multi::separated_list1(nom::character::complete::newline, path);
 
-    let (i, (template, recipies)) = nom::sequence::separated_pair(
-        template,
-        nom::multi::many1(nom::character::complete::newline),
-        recipies,
-    )(i)?;
-
-    Ok((
-        i,
-        (template.chars().collect(), recipies.into_iter().collect()),
-    ))
+    let res = paths(i)?;
+    Ok(res)
 }
 
 #[cfg(test)]
 mod tests {
-    const INPUT: &str = "NNCB
-
-CH -> B
-HH -> N
-CB -> H
-NH -> C
-HB -> C
-HC -> B
-HN -> C
-NN -> C
-BH -> H
-NC -> B
-NB -> B
-BN -> B
-BB -> N
-BC -> B
-CC -> N
-CN -> C";
+    const INPUT: &str = "498,4 -> 498,6 -> 496,6
+503,4 -> 502,4 -> 502,9 -> 494,9";
     #[test]
     fn aoc14_parse() {
-        let (_, (template, recipies)) = super::parse(INPUT).unwrap();
-        assert_eq!(template.len(), 4);
-        assert_eq!(recipies.len(), 16);
+        let (_, paths) = super::parse(INPUT).unwrap();
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0].len(), 3);
+        assert_eq!(paths[1].len(), 4);
     }
     #[test]
     fn aoc14_run_1() {
-        assert_eq!(super::run_1(INPUT).unwrap(), 1588);
+        assert_eq!(super::run_1(INPUT).unwrap(), 24);
     }
     #[test]
     fn aoc14_run_2() {
-        // assert_eq!(super::run_2(INPUT).unwrap(), 2188189693529);
+        assert_eq!(super::run_2(INPUT).unwrap(), 93);
     }
 }
