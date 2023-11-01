@@ -34,8 +34,6 @@ fn run_1(input: &str) -> anyhow::Result<isize> {
     let mut cycles = 0;
     evaluate(&mut x, &mut cycles, &prog, &mut signal_strengts);
 
-    dbg! {&signal_strengts};
-
     let max_cycles = *signal_strengts.iter().map(|(c, _)| c).max().unwrap();
     let last_x = signal_strengts[signal_strengts.len() - 1].1;
 
@@ -50,7 +48,6 @@ fn run_1(input: &str) -> anyhow::Result<isize> {
             .unwrap();
         let x = signal_strengts[x_pos - 1].1;
         let ss = x * check_cycle as isize;
-        dbg! {(check_cycle,x, ss)};
         sum += ss;
         check_cycle += 40;
     }
@@ -59,38 +56,47 @@ fn run_1(input: &str) -> anyhow::Result<isize> {
 
 fn run_2(input: &str) -> anyhow::Result<String> {
     let (_, prog) = parse(input).map_err(|e| anyhow::anyhow!("{e}"))?;
-    let mut signal_strengts = vec![(0, 1)];
-    let mut x = 1;
-    let mut cycles = 0;
-    evaluate(&mut x, &mut cycles, &prog, &mut signal_strengts);
-    let last_x = signal_strengts[signal_strengts.len() - 1].1;
-    signal_strengts.push((usize::MAX, last_x));
 
-    dbg! {&signal_strengts};
+    let mut new_prog = Vec::new();
+    // simplify prog by adding a noop before each addx and expand noops
+    for cmd in prog {
+        match cmd {
+            Command::Noop(x) => {
+                for _ in 0..x {
+                    new_prog.push(Command::Noop(1));
+                }
+            }
+            Command::Addx(a) => {
+                new_prog.push(Command::Noop(1));
+                new_prog.push(Command::Addx(a));
+            }
+        }
+    }
 
-    let mut res = String::new();
+    let prog = new_prog;
+    let mut sprite_x = 1;
 
-    let mut cur_ss_idx = 0;
+    let mut res = String::with_capacity(6 * 20);
 
     for i in 0..(6 * 40) {
         if i != 0 && i % 40 == 0 {
             res += "\n";
         }
+        let x = (i % 40) as isize;
 
-        let cycle = i;
-
-        let x = signal_strengts[cur_ss_idx].1;
-        let i = i as isize;
-
-        dbg! {(i, cycle,x, cur_ss_idx)};
-
-        if i >= (x - 1) && i <= (x + 1) {
+        if x >= (sprite_x - 1) && x <= (sprite_x + 1) {
             res += "#";
         } else {
-            res += " ";
+            res += ".";
         }
-        if cycle >= signal_strengts[cur_ss_idx + 1].0 {
-            cur_ss_idx += 1;
+
+        if let Some(cmd) = prog.get(i) {
+            match cmd {
+                Command::Noop(_) => {}
+                Command::Addx(a) => {
+                    sprite_x += a;
+                }
+            }
         }
     }
 
@@ -165,7 +171,7 @@ addx 1";
     }
 
     #[test]
-    #[ignore]
+    // #[ignore]
     fn aoc10_run_2() {
         assert_eq!(
             super::run_2(INPUT_2).unwrap(),
