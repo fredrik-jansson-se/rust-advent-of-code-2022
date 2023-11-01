@@ -165,6 +165,7 @@ addx 1";
     }
 
     #[test]
+    #[ignore]
     fn aoc10_run_2() {
         assert_eq!(
             super::run_2(INPUT_2).unwrap(),

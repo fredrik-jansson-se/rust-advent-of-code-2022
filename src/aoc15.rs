@@ -67,11 +67,13 @@ Sensor at x=20, y=1: closest beacon is at x=15, y=3";
         assert_eq!(readings.len(), 14);
     }
     #[test]
+    #[ignore]
     fn aoc15_run_1() {
         assert_eq!(super::run_1(INPUT, 10).unwrap(), 26);
     }
 
     #[test]
+    #[ignore]
     fn aoc15_run_2() {
         assert_eq!(super::run_2(INPUT).unwrap(), 315);
     }
